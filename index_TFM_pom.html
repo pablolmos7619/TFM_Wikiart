@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<style>
+
+    .links line {
+        stroke: #ff0000;
+        stroke-opacity: 0.6;
+    }
+
+    .nodes circle {
+        stroke: #000000;
+        stroke-width: 2px;
+    }  text {
+        font-family: sans-serif;
+        font-size: 10px;
+    }
+
+    div.tooltip {
+        position: absolute;
+        text-align: center;
+        padding: 2px;
+        font: 12px sans-serif;
+        border: px;
+        border-radius: 5px;
+        pointer-events: none;
+    }
+</style>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TFM Pablo Olmos Martinez</title>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+</head>
+
+<body>
+	<div id="content">
+        <svg width="3000" height="2000"></svg>
+    </div>
+
+
+<script>
+    var svg = d3.select("svg"),
+        width = +svg.attr("width"),
+        height = +svg.attr("height");
+
+
+    var pattern_def = svg.append("defs");
+
+var simulation = d3.forceSimulation()
+        .force("link", d3.forceLink().id(function(d) { return d.id; }))
+        .force("charge", d3.forceManyBody().strength(-50))
+        .force("collide", d3.forceCollide().radius(function (d) {
+            return calculateSize(d)
+        }))
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .on("end", function() {
+            simulation.alpha(2500); // Establece la tasa de enfriamiento a 0 para detener la simulación
+        });
+
+
+
+
+    var color = d3.scaleOrdinal(d3.schemeCategory20);
+    var durationScale = d3.scaleLinear().domain([0, 400000]).range([1, 10]);
+    var popScale = d3.scaleLinear().domain([0,10000]).range([1,2500])
+
+
+    var div = d3.select("body").append("div")
+        .attr("class", "tooltip")
+        .style("opacity", 0.9);
+
+
+    d3.json("tfm_pom.json", function(error, graph) {
+        if (error) throw error;
+
+        var idImage=1;
+
+        var link = svg.append("g")
+              .attr("class", "links")
+              .selectAll("line")
+              .data(graph.links)
+              .enter().append("line")
+              .style("stroke-width", function(d) {
+                  return Math.sqrt(0,01);
+              });
+
+        var node = svg.append("g")
+            .attr("class", "nodes")
+            .selectAll("g")
+            .data(graph.nodes)
+            .enter().append("g")
+            .attr("xlink:href",function (d) {
+                  return d.image;
+              })
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag",  dragged)
+                .on("end",   dragended));
+
+                    // adds images as nodes
+
+
+        let text = node.append("title")
+           .text(function (d) {
+                return  "Nombre: "     + d.nombre   + "\n" +
+                        "Cluster: "    + d.Cluster  + "\n"
+
+            })
+
+  var circles;
+        circles = node.append("circle")
+            .attr("r", function (d) {
+                   //return d.closeness * 20;
+                  return 15;
+              })
+
+            .attr("fill", function (d) {
+                if (d['image']) {
+                    pattern_def.append("pattern")
+                        .attr("id", "image-" + idImage)
+                        .attr("patternContentUnits", "objectBoundingBox")
+                        .attr("width", "100%")
+                        .attr("height", "100%")
+                        .attr("viewBox", "0 0 1 1");
+
+                    d3.select("#" + "image-" + idImage)
+                        .append("image")
+                        .attr("xlink:href", d.image)
+                        .attr("x", 0)
+                        .attr("y", 0)
+                        .attr("width", "1")
+                        .attr("height", "1")
+                        .attr("preserveAspectRatio", "none");
+                    var returnVal = "url(#image-" + idImage + ")";
+                    idImage++;
+                    return returnVal;
+                } else {
+                    return '#fffef2'; //el fondo por defecto para los que no tienen picture
+                }
+            })
+
+
+
+            .style("stroke-width", 2) // esto es el tamaño del borde del circulo
+            //.style("stroke", function (d) {
+                // return color(d.community)
+              //})
+            // la paleta de colores del borde del circulo random o elegir
+            .style("stroke", function (d) {
+                    if ('Cluster' in d) {
+                        switch (d['Cluster']) {
+
+                            case "Caricaturas":
+                                return '#13b30e';
+                            case "Costumbrismo Español":
+                                return '#1d5705';
+                            case "Retratos Aristocráticos":
+                                return '#1149ff';
+                            case "Grabados y dibujos costumbristas":
+                                return '#8512ff';
+                            case "Retratos Oscuros":
+                                return '#ff1226';
+                            default:
+                                return '#ffffff';
+                        }
+                    }
+                })
+
+           .on("mouseover", function (d) {
+                div.transition()
+                    .duration(20)
+                    .style("opacity", .9);
+                div.html(d['nombre'])
+                    .style("left", (d3.event.pageX) + "px")
+                    .style("top",  (d3.event.pageY) + "px")
+                    .style('background', colorForType(d));
+
+            })
+            .on("mouseout", function (d) {
+                div.transition()
+                    .duration(500)
+                    .style("opacity", 0);
+            })
+            .on("dblclick", function (d) {
+                if ('Cluster' in d) {
+                    switch (d['Cluster'])  {
+                            case null:
+                                return window.open(d.url);
+                            default:
+                                return window.open(d.url) ;;
+
+
+                }
+            }});
+
+
+      var setEvents = node
+            .on( 'mouseenter', function() {
+                // select element in current context
+                d3.select( this ).raise().select('circle')
+                    .transition()
+                    .attr("r", 100);
+            })
+            // set back
+            .on( 'mouseleave', function() {
+                d3.select( this ).select('circle')
+                    .transition()
+                    .attr("r", function(d) {
+                        return  5
+                    });
+            });
+
+        simulation
+            .nodes(graph.nodes)
+            .on("tick", ticked);
+
+        simulation.force("link")
+            .links(graph.links);
+
+        function ticked() {
+            link
+                .attr("x1", function(d) { return d.source.x; })
+                .attr("y1", function(d) { return d.source.y; })
+                .attr("x2", function(d) { return d.target.x; })
+                .attr("y2", function(d) { return d.target.y; });
+
+            node
+                .attr("transform", function(d) {
+                    return "translate(" + d.x + "," + d.y + ")";
+                })
+        }
+
+
+        function dragstarted(d) {
+            if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(d) {
+            d.fx = d3.event.x;
+            d.fy = d3.event.y;
+        }
+
+        function dragended(d) {
+            if (!d3.event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+    })
+
+    function calculateSize(d) {
+ 	    return 1;
+    }
+
+    function colorForType(d) {
+        switch (d["Cluster"]) {
+            case 'name': return color(0);
+            case 'Cluster': return color(1);
+
+
+        }
+    }
+</script>
+</body>
+</html>
